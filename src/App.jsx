@@ -3,7 +3,7 @@ import {
   Lock, Unlock, CheckCircle2, ChevronUp, ChevronDown,
   Sparkles, KeyRound, ScrollText, Radio, MapPin, Users, ArrowRight, Smartphone, BookLock, Eye, Trash2
 } from "lucide-react";
-import { db } from "./firebase.js";
+import { db } from "./firebase";
 import { doc, getDoc, setDoc, onSnapshot, collection, serverTimestamp } from "firebase/firestore";
 
 /* ─────────────────────────────────────────
@@ -844,7 +844,10 @@ function LoginScreen({ onLogin }) {
         <p style={{ fontSize: 15, color: C.muted, marginBottom: 10 }}>스태프에게 받은 비밀번호를 입력하세요</p>
         <div style={{ display: "flex", gap: 10 }}>
           <input
-            type="password"
+            type="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
             value={val}
             onChange={(e) => { setVal(e.target.value); setError(false); }}
             onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
