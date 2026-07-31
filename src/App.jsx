@@ -828,11 +828,11 @@ function LoginScreen({ onLogin }) {
 
         <div style={{
           width: "100%", aspectRatio: "16 / 10", borderRadius: 12, marginBottom: 22,
-          background: `${C.card} center/cover no-repeat url("/cover.jpg")`,
+          background: `${C.card} center/cover no-repeat url("${import.meta.env.BASE_URL}cover.jpg")`,
           border: `1px solid #5A4530`, display: "flex", alignItems: "center", justifyContent: "center",
           overflow: "hidden",
         }}>
-          <img src="/cover.jpg" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          <img src={`${import.meta.env.BASE_URL}cover.jpg`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }} />
         </div>
 
