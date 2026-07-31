@@ -72,15 +72,15 @@ const DIARY_CARDS = [
 ];
 
 const CHAT_CARDS = [
-    { id: "m1", time: "08:50", text: "서궁아… 지화가 내 이름 적힌 봉투 갖고 있는 거 봤어.", fake: false },
+    { id: "m1", time: "08:50", text: "선궁아… 지화가 내 이름 적힌 봉투 갖고 있는 거 봤어.", fake: false },
     { id: "m2", time: "08:52", text: "뭐? 언제?", fake: false },
     { id: "m3", time: "08:53", text: "아까 아침에, 방송실에서.", fake: false },
     { id: "m4", time: "09:15", text: "내가 좀 알아볼게. 걱정하지 마.", fake: false },
     { id: "m5", time: "09:30", text: "지화한테 아직 아무것도 못 물어봤어. 근데 뭔가 알아낸 거 같기도 하고…", fake: false },
 ];
 
-const CIPHER_TEXT = "시찬내 래다 라뤄쿠마다 다앙체 믈처닸처";
-const CIPHER_ANSWER = "미안해 내가 나눠주다가 가방에 들어갔어";
+const CIPHER_TEXT = "시찬내 견키장카블 촒디마다 래 다앙체 믈처닸처";
+const CIPHER_ANSWER = "미안해 편지상자를 옮기다가 내 가방에 들어갔어";
 const CONSONANTS = ["ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
 
 const TIER2_GATES = {
@@ -91,7 +91,14 @@ const TIER2_GATES = {
         check: (v) => v.replace(/\s/g, "").includes("정뭉환") && v.replace(/\s/g, "").includes("백지화"),
         reveal: "백지화의 목격담: \"어제 밤 야식 가지러 방송실 지나가다가 불 켜진 걸 보고 들어갔어요. 책상 위에 낯선 봉투가 있길래 열어봤죠. 누가 놓은 건지는 전혀 몰랐어요. 그래서 일단 서랍에 넣어뒀는데... 오늘 아침에 다시 한번 꺼내서 살펴보고 있었거든요. 근데 그때 갑자기 정뭉환이 들어오더니, 제 손에 있는 봉투를 보고는 아무 말도 없이 그냥 나가버렸어요. 왜 그러는지 진짜 모르겠어요.\"",
     },
-      lobby2f: {
+    lobby1f: {
+        type: "text",
+        requires: "30",
+        question: "방금 정리한 문자 기록은 총 몇 개였나?",
+        check: (v) => v.replace(/\s/g, "").replace("개", "") === "5",
+        reveal: "타임라인을 자세히 보니, 윤서궁이 답을 망설인 그 사이 무언가 더 있었을지도 모른다는 의심이 든다.",
+    },
+    lobby2f: {
         type: "scrambled",
         requires: "NOTE",
         reversedAnswer: "그 말은 진심이 아니었어",
@@ -132,6 +139,7 @@ const FINAL_QUESTIONS = [
         options: ["백지화가 편지를 갖고 있었다고 소문이 나서", "백지화가 서랍에서 봉투를 다시 꺼내보는 걸 목격", "백지화가 아무 설명도 없이 사라져서", "백지화가 최수잔과 짜고 숨겼다고 생각해서"],
         a: "백지화가 서랍에서 봉투를 다시 꺼내보는 걸 목격",
     },
+    { id: "q10", type: "text", q: "3년 전, 편지 배달(정리) 담당자는 누구였나?", a: "시며수" },
 ];
 
 const CHARACTERS = {
@@ -790,7 +798,6 @@ function emptyProgress() {
         tier3: { room306: false },
         quiz: {},
         quizSubmitted: false,
-        quizSubmittedAt: null,
     };
 }
 
@@ -1148,6 +1155,10 @@ function TeamGame({ team, onLogout }) {
                                         ) : (
                                             <>
                                                 <ChatPuzzle done={progress.tier1.lobby1f} onClear={() => clearTier1("lobby1f", ["30"])} />
+                                                {progress.tier1.lobby1f && (
+                                                    <Tier2Gate gateKey="lobby1f" fragments={progress.fragments} cleared={progress.tier2.lobby1f}
+                                                               onClear={() => clearTier2("lobby1f", null)} />
+                                                )}
                                             </>
                                         )}
                                     </>
@@ -1258,6 +1269,17 @@ function AdminPanel({ onLogout }) {
         return () => unsub();
     }, []);
 
+    const scoreOf = (p) => {
+        if (!p || !p.quiz) return 0;
+        return FINAL_QUESTIONS.reduce((acc, q) => {
+            const v = p.quiz[q.id];
+            if (!v) return acc;
+            if (q.type === "choice") return acc + (v === q.a ? 1 : 0);
+            const norm = (s) => s.replace(/\s/g, "");
+            return acc + (norm(v).includes(norm(q.a).slice(0, 3)) || norm(q.a).includes(norm(v)) ? 1 : 0);
+        }, 0);
+    };
+
     const resetTeam = async (t) => {
         if (!window.confirm(`${t}의 모든 진행상황을 삭제할까요? 되돌릴 수 없습니다.`)) return;
         setDeleting(t);
@@ -1294,9 +1316,7 @@ function AdminPanel({ onLogout }) {
                         const fragCount = p?.fragments?.filter((f) => ["WAKE", "BAG", "DIARY", "30", "NOTE", "03"].includes(f)).length || 0;
                         const finalDone = p?.tier3?.room306;
                         const submitted = p?.quizSubmitted;
-                        const submittedAt = p?.quizSubmittedAt
-                            ? new Date(p.quizSubmittedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                            : null;
+                        const score = scoreOf(p);
                         return (
                             <div key={t} style={{
                                 display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
@@ -1306,7 +1326,7 @@ function AdminPanel({ onLogout }) {
                                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                                     <Chip>조각 {fragCount}/6</Chip>
                                     {finalDone && <Chip tone="good">최종증거 확보</Chip>}
-                                    {submitted ? <Chip tone="good">제출완료 {submittedAt ? `${submittedAt}` : ""}</Chip> : <Chip>미제출</Chip>}
+                                    {submitted ? <Chip tone="good">제출완료 {score}/9</Chip> : <Chip>미제출</Chip>}
                                     <button onClick={() => resetTeam(t)} disabled={deleting === t}
                                             style={{
                                                 display: "flex", alignItems: "center", gap: 4, background: "rgba(217,119,106,0.12)",
@@ -1331,8 +1351,17 @@ function QuizPanel({ progress, setProgress }) {
 
     const submit = () => {
         setSubmitted(true);
-        setProgress((p) => ({ ...p, quiz: local, quizSubmitted: true, quizSubmittedAt: Date.now() }));
+        setProgress((p) => ({ ...p, quiz: local, quizSubmitted: true }));
     };
+
+    const isCorrect = (q) => {
+        const v = local[q.id];
+        if (!v) return false;
+        if (q.type === "choice") return v === q.a;
+        const norm = (s) => s.replace(/\s/g, "");
+        return norm(v).includes(norm(q.a).slice(0, 3)) || norm(q.a).includes(norm(v));
+    };
+    const score = FINAL_QUESTIONS.reduce((acc, q) => acc + (isCorrect(q) ? 1 : 0), 0);
 
     return (
         <div style={{ background: C.panel, borderRadius: 14, padding: 18, border: `1px solid ${C.gold}` }}>
@@ -1348,9 +1377,12 @@ function QuizPanel({ progress, setProgress }) {
                             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                 {q.options.map((opt) => {
                                     const selected = local[q.id] === opt;
-                                    const border = selected ? C.gold : "#5A4530";
-                                    const bg = selected ? "rgba(203,163,90,0.12)" : "transparent";
-                                    const color = selected ? C.gold : C.cream;
+                                    const showResult = submitted;
+                                    const isRight = opt === q.a;
+                                    let border = "#5A4530", bg = "transparent", color = C.cream;
+                                    if (showResult && isRight) { border = C.good; bg = "rgba(143,191,122,0.12)"; color = C.good; }
+                                    else if (showResult && selected && !isRight) { border = C.bad; bg = "rgba(217,119,106,0.12)"; color = C.bad; }
+                                    else if (!showResult && selected) { border = C.gold; bg = "rgba(203,163,90,0.12)"; color = C.gold; }
                                     return (
                                         <button key={opt} disabled={submitted}
                                                 onClick={() => setLocal((p) => ({ ...p, [q.id]: opt }))}
@@ -1368,7 +1400,7 @@ function QuizPanel({ progress, setProgress }) {
                                 disabled={submitted}
                                 style={{
                                     width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8,
-                                    border: `1.5px solid ${submitted ? C.muted : "#5A4530"}`,
+                                    border: `1.5px solid ${submitted ? (isCorrect(q) ? C.good : C.bad) : "#5A4530"}`,
                                     background: C.card, color: C.cream, fontSize: 13.5,
                                 }} />
                         )}
@@ -1379,8 +1411,10 @@ function QuizPanel({ progress, setProgress }) {
                 <div style={{ marginTop: 16 }}><PrimaryButton onClick={submit}>제출하기</PrimaryButton></div>
             ) : (
                 <div style={{ marginTop: 16, background: "rgba(203,163,90,0.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 14 }}>
-                    <p style={{ color: C.gold, fontWeight: 800, fontSize: 15 }}>✅ 제출 완료</p>
-                    <p style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>진상규명 보고서가 제출되었습니다.</p>
+                    <p style={{ color: C.gold, fontWeight: 800, fontSize: 15 }}>제출 완료 — 채점: {score} / {FINAL_QUESTIONS.length}</p>
+                    <p style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
+                        객관식은 정확히 채점되고, 이름·내용 등 서술형은 근접 매칭으로 채점됩니다.
+                    </p>
                 </div>
             )}
         </div>
