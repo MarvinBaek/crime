@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Lock, Unlock, CheckCircle2, ChevronUp, ChevronDown,
-  Sparkles, KeyRound, ScrollText, Radio, MapPin, Users, ArrowRight, Smartphone, BookLock
+  Sparkles, KeyRound, ScrollText, Radio, MapPin, Users, ArrowRight, Smartphone, BookLock, Eye
 } from "lucide-react";
+import { db } from "./firebase.js";
+import { doc, getDoc, setDoc, onSnapshot, collection, serverTimestamp } from "firebase/firestore";
 
 /* ─────────────────────────────────────────
    토큰 (팔레트/타이포) — 오프닝 PPT와 동일 계열
@@ -87,16 +89,16 @@ const TIER2_GATES = {
   broadcastDesk: {
     type: "text",
     requires: "WAKE",
-    question: "예배당 로직 그리드에서, 새벽 3시 알리바이가 '확인되지 않은' 사람은 총 몇 명인가?",
-    check: (v) => v.replace(/\s/g, "") === "3",
+    question: "예배당에서 확인한, 새벽 3시 '독립적 증언'으로 알리바이가 확실했던 두 사람은? (쉼표로 구분)",
+    check: (v) => v.replace(/\s/g, "").includes("정뭉환") && v.replace(/\s/g, "").includes("백지화"),
     reveal: "백지화의 목격담: \"어제 밤 야식 가지러 방송실 지나가다가 불 켜진 걸 보고 들어갔어요. 책상 위에 낯선 봉투가 있길래 열어봤죠. 누가 놓은 건지는 전혀 몰랐어요. 그래서 일단 서랍에 넣어뒀는데... 오늘 아침에 다시 한번 꺼내서 살펴보고 있었거든요. 근데 그때 갑자기 정뭉환이 들어오더니, 제 손에 있는 봉투를 보고는 아무 말도 없이 그냥 나가버렸어요. 왜 그러는지 진짜 모르겠어요.\"",
   },
   lobby1f: {
     type: "text",
     requires: "30",
-    question: "정뭉환의 첫 메시지(08:50)와 윤서궁의 마지막 메시지(09:30) 사이, 몇 분이 지났는가?",
-    check: (v) => v.replace(/\s/g, "").replace("분", "") === "40",
-    reveal: "타임라인을 자세히 보니, 윤서궁이 답을 망설인 그 40분 사이 무언가 더 있었을지도 모른다는 의심이 든다.",
+    question: "방금 정리한 문자 기록 중, 정뭉환과 윤서궁이 나눈 '진짜' 대화는 총 몇 개였나? (가짜 대화 제외)",
+    check: (v) => v.replace(/\s/g, "").replace("개", "") === "5",
+    reveal: "타임라인을 자세히 보니, 윤서궁이 답을 망설인 그 사이 무언가 더 있었을지도 모른다는 의심이 든다.",
   },
   lobby2f: {
     type: "reverse",
@@ -107,8 +109,8 @@ const TIER2_GATES = {
   room306: {
     type: "text",
     requires: "GATE_LOBBY2F",
-    question: "사건 발생부터 편지 발견까지 3년, 발견 후 오늘까지 2개월. 이걸 모두 '개월 수'로 환산해 더하면?",
-    check: (v) => v.replace(/\s/g, "").replace("개월", "") === "38",
+    question: "최수잔이 그날 오후 버스에서 쓴 사과 카톡, 결국 어떻게 됐나?",
+    check: (v) => v.replace(/\s/g, "").includes("못보냈"),
     reveal: "시며수의 최근 일기 뒷부분: \"C가 안 왔다. 방송실에 두고 그냥 도망쳤다. 내일 아침 일찍 가서 다시 가져와야지 했는데… 너무 지쳐서 잠들어버렸다.\"",
   },
 };
@@ -417,18 +419,37 @@ function OrderList({ items, setItems, disabled }) {
 
 function DiaryPuzzle({ done, onClear }) {
   const [order] = useState(() => [...DIARY_CARDS].sort(() => Math.random() - 0.5));
+  const [picked, setPicked] = useState(null);
 
   return (
     <div>
-      <p style={{ color: C.cream, fontSize: 14.5, marginBottom: 10, fontWeight: 600 }}>
+      <p style={{ color: C.cream, fontSize: 14.5, marginBottom: 4, fontWeight: 600 }}>
         최수잔의 다이어리 — 날짜 없이 뒤섞인 페이지들, 이 사건과 무관한 페이지도 섞여 있다
       </p>
+      <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>
+        어느 페이지가 이 사건과 무관한지 짚어보세요. (카드를 눌러보세요)
+      </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-        {order.map((c, i) => (
-          <Paper key={c.id} rotate={(i % 3 - 1) * 0.5}>
-            {c.text}
-          </Paper>
-        ))}
+        {order.map((c, i) => {
+          const isPicked = picked === c.id;
+          const isFake = c.id === "FAKE";
+          return (
+            <div key={c.id} onClick={() => setPicked(c.id)} style={{ cursor: "pointer" }}>
+              <Paper rotate={(i % 3 - 1) * 0.5}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <span>{c.text}</span>
+                  {isPicked && (
+                    <span style={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 4,
+                      background: isFake ? "rgba(139,58,42,0.15)" : "rgba(46,36,21,0.1)",
+                      color: isFake ? PAPER.pin : PAPER.text,
+                    }}>{isFake ? "무관해 보임" : "이 사건과 관련"}</span>
+                  )}
+                </div>
+              </Paper>
+            </div>
+          );
+        })}
       </div>
       {!done ? (
         <PrimaryButton onClick={onClear}>제출</PrimaryButton>
@@ -779,11 +800,45 @@ export default function App() {
   const [active, setActive] = useState("sanctuary");
   const [showQuiz, setShowQuiz] = useState(false);
   const [showCards, setShowCards] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
+  const loadedOnceRef = useRef({});
 
   const progress = progressByTeam[team];
   const setProgress = (updater) => {
     setProgressByTeam((prev) => ({ ...prev, [team]: updater(prev[team]) }));
   };
+
+  // 팀을 바꿀 때, Firestore에 저장된 진행상황을 불러온다 (한 번만)
+  useEffect(() => {
+    if (loadedOnceRef.current[team]) return;
+    loadedOnceRef.current[team] = true;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "teams", team));
+        if (snap.exists() && snap.data().progress) {
+          setProgressByTeam((prev) => ({ ...prev, [team]: { ...emptyProgress(), ...snap.data().progress } }));
+        }
+      } catch (e) {
+        console.error("Firestore 불러오기 실패:", e);
+      }
+    })();
+  }, [team]);
+
+  // progress가 바뀔 때마다 Firestore에 저장한다
+  useEffect(() => {
+    setSyncStatus("syncing");
+    const t = setTimeout(async () => {
+      try {
+        await setDoc(doc(db, "teams", team), { progress, updatedAt: serverTimestamp() }, { merge: true });
+        setSyncStatus("ok");
+      } catch (e) {
+        console.error("Firestore 저장 실패:", e);
+        setSyncStatus("error");
+      }
+    }, 600); // 짧은 디바운스로 너무 잦은 쓰기 방지
+    return () => clearTimeout(t);
+  }, [progress, team]);
 
   const addFragment = (frag) => {
     setProgress((p) => p.fragments.includes(frag) ? p : { ...p, fragments: [...p.fragments, frag] });
@@ -837,11 +892,23 @@ export default function App() {
               style={{ background: C.card, color: C.cream, border: `1px solid #5A4530`, borderRadius: 8, padding: "7px 10px", fontSize: 13.5 }}>
               {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
+            <button onClick={() => setShowAdmin((v) => !v)} title="스태프용 전체 현황"
+              style={{
+                display: "flex", alignItems: "center", gap: 5, background: showAdmin ? C.card : "transparent",
+                border: `1px solid #5A4530`, borderRadius: 8, padding: "7px 10px", color: C.muted, cursor: "pointer", fontSize: 12.5,
+              }}>
+              <Eye size={14} /> 전체 현황
+            </button>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <Chip><KeyRound size={12} /> 조각 {fragCount}/{totalFragmentGoal}</Chip>
           {finalReady && <Chip tone="good"><Sparkles size={12} /> 최종 증거 확보</Chip>}
+          <span style={{ fontSize: 11, color: C.muted, alignSelf: "center", marginLeft: 4 }}>
+            {syncStatus === "syncing" && "☁️ 저장 중..."}
+            {syncStatus === "ok" && "☁️ 저장됨"}
+            {syncStatus === "error" && "⚠️ 저장 실패 (인터넷 확인)"}
+          </span>
         </div>
       </div>
 
@@ -893,7 +960,9 @@ export default function App() {
 
       {/* 본문 */}
       <div style={{ padding: "18px 20px 0" }}>
-        {showCards ? (
+        {showAdmin ? (
+          <AdminPanel />
+        ) : showCards ? (
           <CharacterCardPanel cards={progress.cards} />
         ) : !showQuiz ? (
           <div style={{ background: C.panel, borderRadius: 14, padding: 18, border: "1px solid #3D2C1E" }}>
@@ -1067,6 +1136,72 @@ function CharacterCardPanel({ cards }) {
               ) : (
                 <p style={{ color: C.muted, fontSize: 12.5 }}>조사 필요 — 관련 장소의 자물쇠를 풀어보세요.</p>
               )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdminPanel() {
+  const [teams, setTeams] = useState({});
+  const [status, setStatus] = useState("loading");
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "teams"),
+      (snap) => {
+        const next = {};
+        snap.forEach((d) => { next[d.id] = d.data().progress || {}; });
+        setTeams(next);
+        setStatus("ok");
+      },
+      (err) => { console.error("Firestore 실시간 조회 실패:", err); setStatus("error"); }
+    );
+    return () => unsub();
+  }, []);
+
+  const scoreOf = (p) => {
+    if (!p || !p.quiz) return 0;
+    return FINAL_QUESTIONS.reduce((acc, q) => {
+      const v = p.quiz[q.id];
+      if (!v) return acc;
+      if (q.type === "choice") return acc + (v === q.a ? 1 : 0);
+      const norm = (s) => s.replace(/\s/g, "");
+      return acc + (norm(v).includes(norm(q.a).slice(0, 3)) || norm(q.a).includes(norm(v)) ? 1 : 0);
+    }, 0);
+  };
+
+  return (
+    <div style={{ background: C.panel, borderRadius: 14, padding: 18, border: `1px solid ${C.gold}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Eye size={16} color={C.gold} />
+        <span style={{ color: C.gold, fontWeight: 800, fontSize: 15, fontFamily: FONT_CASE }}>스태프 전체 현황</span>
+      </div>
+      <p style={{ color: C.muted, fontSize: 11.5, marginBottom: 14 }}>
+        {status === "loading" && "불러오는 중..."}
+        {status === "error" && "⚠️ 실시간 조회 실패 — Firebase 설정을 확인하세요."}
+        {status === "ok" && "실시간으로 업데이트됩니다."}
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {TEAMS.map((t) => {
+          const p = teams[t];
+          const fragCount = p?.fragments?.filter((f) => ["WAKE", "BAG", "DIARY", "30", "NOTE", "03"].includes(f)).length || 0;
+          const finalDone = p?.tier3?.room306;
+          const submitted = p?.quizSubmitted;
+          const score = scoreOf(p);
+          return (
+            <div key={t} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: C.card, borderRadius: 10, padding: "12px 16px", border: `1px solid #5A4530`,
+            }}>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{t}</span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Chip>조각 {fragCount}/6</Chip>
+                {finalDone && <Chip tone="good">최종증거 확보</Chip>}
+                {submitted ? <Chip tone="good">제출완료 {score}/9</Chip> : <Chip>미제출</Chip>}
+              </div>
             </div>
           );
         })}
