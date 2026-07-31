@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Lock, Unlock, CheckCircle2, ChevronUp, ChevronDown,
-  Sparkles, KeyRound, ScrollText, Radio, MapPin, Users, ArrowRight, Smartphone, BookLock, Eye
+  Sparkles, KeyRound, ScrollText, Radio, MapPin, Users, ArrowRight, Smartphone, BookLock, Eye, Trash2
 } from "lucide-react";
 import { db } from "./firebase.js";
 import { doc, getDoc, setDoc, onSnapshot, collection, serverTimestamp } from "firebase/firestore";
@@ -166,9 +166,9 @@ function Chip({ children, tone = "gold" }) {
   const fg = tone === "gold" ? C.gold : C.good;
   return (
     <span style={{
-      background: bg, color: fg, fontSize: 11.5, fontWeight: 700,
-      padding: "4px 10px", borderRadius: 4, display: "inline-flex",
-      alignItems: "center", gap: 4, whiteSpace: "nowrap",
+      background: bg, color: fg, fontSize: 14, fontWeight: 700,
+      padding: "6px 12px", borderRadius: 4, display: "inline-flex",
+      alignItems: "center", gap: 5, whiteSpace: "nowrap",
       border: `1px dashed ${fg}`, letterSpacing: 0.3,
     }}>{children}</span>
   );
@@ -179,14 +179,14 @@ function Paper({ children, rotate = 0, tag }) {
   return (
     <div style={{
       background: PAPER.bg, color: PAPER.text, borderRadius: 3,
-      padding: "12px 14px", position: "relative", boxShadow: "0 3px 10px rgba(0,0,0,0.3)",
+      padding: "14px 16px", position: "relative", boxShadow: "0 3px 10px rgba(0,0,0,0.3)",
       border: `1px solid ${PAPER.border}`, transform: `rotate(${rotate}deg)`,
-      fontSize: 13, lineHeight: 1.6,
+      fontSize: 16, lineHeight: 1.6,
     }}>
       {tag && (
         <span style={{
           position: "absolute", top: -9, left: 12, background: PAPER.pin, color: "#F2E8D8",
-          fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 2, letterSpacing: 0.5,
+          fontSize: 11.5, fontWeight: 700, padding: "3px 9px", borderRadius: 2, letterSpacing: 0.5,
         }}>{tag}</span>
       )}
       {children}
@@ -202,8 +202,8 @@ function PrimaryButton({ children, onClick, disabled, tone = "gold" }) {
       style={{
         background: disabled ? "#5A4530" : (tone === "gold" ? C.gold : C.good),
         color: disabled ? C.muted : C.navy,
-        fontWeight: 700, fontSize: 14, border: "none", borderRadius: 10,
-        padding: "10px 18px", cursor: disabled ? "not-allowed" : "pointer",
+        fontWeight: 700, fontSize: 16.5, border: "none", borderRadius: 10,
+        padding: "12px 22px", cursor: disabled ? "not-allowed" : "pointer",
         transition: "transform 0.1s ease",
       }}
       onMouseDown={(e) => { if (!disabled) e.currentTarget.style.transform = "scale(0.98)"; }}
@@ -217,7 +217,7 @@ function Feedback({ status, text }) {
   const ok = status === "ok";
   return (
     <div style={{
-      marginTop: 10, padding: "10px 12px", borderRadius: 8, fontSize: 13.5,
+      marginTop: 10, padding: "12px 14px", borderRadius: 8, fontSize: 16,
       background: ok ? "rgba(127,191,138,0.12)" : "rgba(224,115,106,0.12)",
       color: ok ? C.good : C.bad, fontWeight: 600,
     }}>{text}</div>
@@ -775,6 +775,8 @@ function FinalPuzzle({ fragments, cleared, onClear }) {
    메인 앱
    ───────────────────────────────────────── */
 const TEAMS = ["1조", "2조", "3조", "4조"];
+const TEAM_PASSWORDS = { "1조": "팥죽", "2조": "사랑", "3조": "이스라엘", "4조": "은혜" };
+const ADMIN_PASSWORD = "baek";
 
 function emptyProgress() {
   return {
@@ -790,43 +792,107 @@ function emptyProgress() {
   };
 }
 
-export default function App() {
-  const [team, setTeam] = useState("1조");
-  const [progressByTeam, setProgressByTeam] = useState(() => {
-    const init = {};
-    TEAMS.forEach((t) => (init[t] = emptyProgress()));
-    return init;
-  });
+/* ─────────────────────────────────────────
+   로그인 화면
+   ───────────────────────────────────────── */
+function LoginScreen({ onLogin }) {
+  const [val, setVal] = useState("");
+  const [error, setError] = useState(false);
+
+  const submit = () => {
+    const v = val.trim();
+    if (v === ADMIN_PASSWORD) {
+      onLogin({ role: "admin" });
+      return;
+    }
+    const matchedTeam = Object.keys(TEAM_PASSWORDS).find((t) => TEAM_PASSWORDS[t] === v);
+    if (matchedTeam) {
+      onLogin({ role: "team", team: matchedTeam });
+      return;
+    }
+    setError(true);
+  };
+
+  return (
+    <div style={{
+      fontFamily: FONT, background: C.navy, minHeight: "100vh", color: C.cream,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      backgroundImage: "radial-gradient(ellipse at top, rgba(203,163,90,0.08), transparent 60%)",
+    }}>
+      <div style={{ width: "100%", maxWidth: 440 }}>
+        <div style={{
+          border: `2px solid ${PAPER.pin}`, color: PAPER.pin, borderRadius: 4, padding: "6px 12px",
+          fontSize: 13, fontWeight: 800, letterSpacing: 1, transform: "rotate(-4deg)", fontFamily: FONT_CASE,
+          display: "inline-block", marginBottom: 18,
+        }}>사건 기록<br />CASE №0801</div>
+
+        <div style={{
+          width: "100%", aspectRatio: "16 / 10", borderRadius: 12, marginBottom: 22,
+          background: `${C.card} center/cover no-repeat url("/cover.jpg")`,
+          border: `1px solid #5A4530`, display: "flex", alignItems: "center", justifyContent: "center",
+          overflow: "hidden",
+        }}>
+          <img src="/cover.jpg" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        </div>
+
+        <div style={{ fontSize: 15, color: C.muted, letterSpacing: 1.5, marginBottom: 6 }}>크라임씬</div>
+        <div style={{ fontSize: 34, fontWeight: 800, color: C.cream, fontFamily: FONT_CASE, marginBottom: 26, lineHeight: 1.25 }}>
+          3년 후의<br />롤링페이퍼
+        </div>
+
+        <p style={{ fontSize: 15, color: C.muted, marginBottom: 10 }}>스태프에게 받은 비밀번호를 입력하세요</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <input
+            type="password"
+            value={val}
+            onChange={(e) => { setVal(e.target.value); setError(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            placeholder="비밀번호"
+            style={{
+              flex: 1, padding: "14px 16px", borderRadius: 10, fontSize: 18,
+              border: `1.5px solid ${error ? C.bad : "#5A4530"}`, background: C.card, color: C.cream,
+            }}
+          />
+          <PrimaryButton onClick={submit}>입장</PrimaryButton>
+        </div>
+        {error && <Feedback status="no" text="비밀번호가 맞지 않습니다. 스태프에게 다시 확인해보세요." />}
+      </div>
+    </div>
+  );
+}
+
+function TeamGame({ team, onLogout }) {
+  const [progress, setProgressRaw] = useState(emptyProgress());
+  const [loaded, setLoaded] = useState(false);
   const [active, setActive] = useState("sanctuary");
   const [showQuiz, setShowQuiz] = useState(false);
   const [showCards, setShowCards] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | ok | error
-  const loadedOnceRef = useRef({});
+  const loadedOnceRef = useRef(false);
 
-  const progress = progressByTeam[team];
-  const setProgress = (updater) => {
-    setProgressByTeam((prev) => ({ ...prev, [team]: updater(prev[team]) }));
-  };
+  const setProgress = (updater) => setProgressRaw((prev) => updater(prev));
 
-  // 팀을 바꿀 때, Firestore에 저장된 진행상황을 불러온다 (한 번만)
+  // 처음 로그인할 때, Firestore에 저장된 진행상황을 불러온다
   useEffect(() => {
-    if (loadedOnceRef.current[team]) return;
-    loadedOnceRef.current[team] = true;
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
     (async () => {
       try {
         const snap = await getDoc(doc(db, "teams", team));
         if (snap.exists() && snap.data().progress) {
-          setProgressByTeam((prev) => ({ ...prev, [team]: { ...emptyProgress(), ...snap.data().progress } }));
+          setProgressRaw({ ...emptyProgress(), ...snap.data().progress });
         }
       } catch (e) {
         console.error("Firestore 불러오기 실패:", e);
       }
+      setLoaded(true);
     })();
   }, [team]);
 
   // progress가 바뀔 때마다 Firestore에 저장한다
   useEffect(() => {
+    if (!loaded) return;
     setSyncStatus("syncing");
     const t = setTimeout(async () => {
       try {
@@ -836,9 +902,9 @@ export default function App() {
         console.error("Firestore 저장 실패:", e);
         setSyncStatus("error");
       }
-    }, 600); // 짧은 디바운스로 너무 잦은 쓰기 방지
+    }, 600);
     return () => clearTimeout(t);
-  }, [progress, team]);
+  }, [progress, team, loaded]);
 
   const addFragment = (frag) => {
     setProgress((p) => p.fragments.includes(frag) ? p : { ...p, fragments: [...p.fragments, frag] });
@@ -878,33 +944,34 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
-              border: `2px solid ${PAPER.pin}`, color: PAPER.pin, borderRadius: 4, padding: "4px 8px",
-              fontSize: 10.5, fontWeight: 800, letterSpacing: 1, transform: "rotate(-4deg)", fontFamily: FONT_CASE,
-            }}>사건 기록<br />CASE №0330</div>
+              border: `2px solid ${PAPER.pin}`, color: PAPER.pin, borderRadius: 4, padding: "5px 10px",
+              fontSize: 12.5, fontWeight: 800, letterSpacing: 1, transform: "rotate(-4deg)", fontFamily: FONT_CASE,
+            }}>사건 기록<br />CASE №0801</div>
             <div>
-              <div style={{ fontSize: 11.5, color: C.muted, letterSpacing: 1.5 }}>3년 후의 롤링페이퍼</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.cream, fontFamily: FONT_CASE }}>진상규명 사건 파일</div>
+              <div style={{ fontSize: 13, color: C.muted, letterSpacing: 1.5 }}>3년 후의 롤링페이퍼</div>
+              <div style={{ fontSize: 23, fontWeight: 800, color: C.cream, fontFamily: FONT_CASE }}>진상규명 사건 파일</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Users size={16} color={C.muted} />
-            <select value={team} onChange={(e) => setTeam(e.target.value)}
-              style={{ background: C.card, color: C.cream, border: `1px solid #5A4530`, borderRadius: 8, padding: "7px 10px", fontSize: 13.5 }}>
-              {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <button onClick={() => setShowAdmin((v) => !v)} title="스태프용 전체 현황"
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6, background: C.card, border: `1px solid #5A4530`,
+              borderRadius: 8, padding: "9px 14px", color: C.gold, fontSize: 16, fontWeight: 700,
+            }}>
+              <Users size={17} /> {team}
+            </div>
+            <button onClick={onLogout} title="로그아웃"
               style={{
-                display: "flex", alignItems: "center", gap: 5, background: showAdmin ? C.card : "transparent",
-                border: `1px solid #5A4530`, borderRadius: 8, padding: "7px 10px", color: C.muted, cursor: "pointer", fontSize: 12.5,
+                background: "transparent", border: `1px solid #5A4530`, borderRadius: 8, padding: "9px 12px",
+                color: C.muted, cursor: "pointer", fontSize: 14,
               }}>
-              <Eye size={14} /> 전체 현황
+              로그아웃
             </button>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <Chip><KeyRound size={12} /> 조각 {fragCount}/{totalFragmentGoal}</Chip>
           {finalReady && <Chip tone="good"><Sparkles size={12} /> 최종 증거 확보</Chip>}
-          <span style={{ fontSize: 11, color: C.muted, alignSelf: "center", marginLeft: 4 }}>
+          <span style={{ fontSize: 13, color: C.muted, alignSelf: "center", marginLeft: 4 }}>
             {syncStatus === "syncing" && "☁️ 저장 중..."}
             {syncStatus === "ok" && "☁️ 저장됨"}
             {syncStatus === "error" && "⚠️ 저장 실패 (인터넷 확인)"}
@@ -921,48 +988,46 @@ export default function App() {
           return (
             <button key={loc.id} onClick={() => { setActive(loc.id); setShowQuiz(false); setShowCards(false); }}
               style={{
-                display: "flex", alignItems: "center", gap: 6, padding: "10px 14px",
+                display: "flex", alignItems: "center", gap: 6, padding: "11px 16px",
                 borderRadius: "8px 8px 0 0",
                 background: isActive ? C.panel : C.card,
                 border: `1.5px solid ${isActive ? C.gold : C.borderSoft}`,
                 borderBottom: isActive ? `1.5px solid ${C.panel}` : `1.5px solid ${C.borderSoft}`,
                 marginBottom: -1, position: "relative", zIndex: isActive ? 2 : 1,
-                color: isActive ? C.gold : C.muted, cursor: "pointer", fontSize: 13.5, fontWeight: 700,
+                color: isActive ? C.gold : C.muted, cursor: "pointer", fontSize: 15.5, fontWeight: 700,
               }}>
-              <Icon size={14} />
+              <Icon size={15} />
               {loc.name}
-              {cleared ? <CheckCircle2 size={13} color={C.good} /> : <Lock size={12} color={C.muted} />}
+              {cleared ? <CheckCircle2 size={14} color={C.good} /> : <Lock size={13} color={C.muted} />}
             </button>
           );
         })}
         <button onClick={() => { setShowCards(true); setShowQuiz(false); }}
           style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: "8px 8px 0 0",
+            display: "flex", alignItems: "center", gap: 6, padding: "11px 16px", borderRadius: "8px 8px 0 0",
             background: showCards ? C.panel : C.card, color: showCards ? C.gold : C.muted,
             border: `1.5px solid ${showCards ? C.gold : C.borderSoft}`,
             borderBottom: showCards ? `1.5px solid ${C.panel}` : `1.5px solid ${C.borderSoft}`,
             marginBottom: -1, position: "relative", zIndex: showCards ? 2 : 1,
-            cursor: "pointer", fontSize: 13.5, fontWeight: 700,
+            cursor: "pointer", fontSize: 15.5, fontWeight: 700,
           }}>
-          <Users size={14} /> 인물 카드
+          <Users size={15} /> 인물 카드
         </button>
         {allTier1Done && (
           <button onClick={() => { setShowQuiz(true); setShowCards(false); }}
             style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 10,
+              display: "flex", alignItems: "center", gap: 6, padding: "11px 16px", borderRadius: 10,
               background: showQuiz ? C.gold : "transparent", color: showQuiz ? C.navy : C.gold,
-              border: `1.5px solid ${C.gold}`, cursor: "pointer", fontSize: 13.5, fontWeight: 700,
+              border: `1.5px solid ${C.gold}`, cursor: "pointer", fontSize: 15.5, fontWeight: 700,
             }}>
-            <ScrollText size={14} /> 진상규명지 <ArrowRight size={13} />
+            <ScrollText size={15} /> 진상규명지 <ArrowRight size={14} />
           </button>
         )}
       </div>
 
       {/* 본문 */}
       <div style={{ padding: "18px 20px 0" }}>
-        {showAdmin ? (
-          <AdminPanel />
-        ) : showCards ? (
+        {showCards ? (
           <CharacterCardPanel cards={progress.cards} />
         ) : !showQuiz ? (
           <div style={{ background: C.panel, borderRadius: 14, padding: 18, border: "1px solid #3D2C1E" }}>
@@ -1093,10 +1158,6 @@ export default function App() {
           <QuizPanel progress={progress} setProgress={setProgress} />
         )}
       </div>
-
-      <div style={{ padding: "16px 20px 0", color: C.muted, fontSize: 11.5 }}>
-        * 데모 프로토타입 — 현재는 브라우저 로컬 상태로만 동작합니다. 실제 운영 시 Firebase Firestore로 팀별 진행상황을 저장하도록 연동 지점을 별도로 안내드릴게요.
-      </div>
     </div>
   );
 }
@@ -1144,9 +1205,10 @@ function CharacterCardPanel({ cards }) {
   );
 }
 
-function AdminPanel() {
+function AdminPanel({ onLogout }) {
   const [teams, setTeams] = useState({});
   const [status, setStatus] = useState("loading");
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -1173,38 +1235,66 @@ function AdminPanel() {
     }, 0);
   };
 
+  const resetTeam = async (t) => {
+    if (!window.confirm(`${t}의 모든 진행상황을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setDeleting(t);
+    try {
+      await setDoc(doc(db, "teams", t), { progress: emptyProgress(), updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.error("삭제 실패:", e);
+      alert("삭제에 실패했습니다. 인터넷 연결을 확인해주세요.");
+    }
+    setDeleting(null);
+  };
+
   return (
-    <div style={{ background: C.panel, borderRadius: 14, padding: 18, border: `1px solid ${C.gold}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <Eye size={16} color={C.gold} />
-        <span style={{ color: C.gold, fontWeight: 800, fontSize: 15, fontFamily: FONT_CASE }}>스태프 전체 현황</span>
+    <div style={{ fontFamily: FONT, background: C.navy, minHeight: "100vh", color: C.cream, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Eye size={20} color={C.gold} />
+          <span style={{ color: C.gold, fontWeight: 800, fontSize: 22, fontFamily: FONT_CASE }}>스태프 전체 현황</span>
+        </div>
+        <button onClick={onLogout} style={{
+          background: "transparent", border: `1px solid #5A4530`, borderRadius: 8, padding: "9px 14px",
+          color: C.muted, cursor: "pointer", fontSize: 14,
+        }}>로그아웃</button>
       </div>
-      <p style={{ color: C.muted, fontSize: 11.5, marginBottom: 14 }}>
-        {status === "loading" && "불러오는 중..."}
-        {status === "error" && "⚠️ 실시간 조회 실패 — Firebase 설정을 확인하세요."}
-        {status === "ok" && "실시간으로 업데이트됩니다."}
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {TEAMS.map((t) => {
-          const p = teams[t];
-          const fragCount = p?.fragments?.filter((f) => ["WAKE", "BAG", "DIARY", "30", "NOTE", "03"].includes(f)).length || 0;
-          const finalDone = p?.tier3?.room306;
-          const submitted = p?.quizSubmitted;
-          const score = scoreOf(p);
-          return (
-            <div key={t} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              background: C.card, borderRadius: 10, padding: "12px 16px", border: `1px solid #5A4530`,
-            }}>
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{t}</span>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Chip>조각 {fragCount}/6</Chip>
-                {finalDone && <Chip tone="good">최종증거 확보</Chip>}
-                {submitted ? <Chip tone="good">제출완료 {score}/9</Chip> : <Chip>미제출</Chip>}
+      <div style={{ background: C.panel, borderRadius: 14, padding: 20, border: `1px solid ${C.gold}` }}>
+        <p style={{ color: C.muted, fontSize: 14, marginBottom: 16 }}>
+          {status === "loading" && "불러오는 중..."}
+          {status === "error" && "⚠️ 실시간 조회 실패 — Firebase 설정을 확인하세요."}
+          {status === "ok" && "실시간으로 업데이트됩니다."}
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {TEAMS.map((t) => {
+            const p = teams[t];
+            const fragCount = p?.fragments?.filter((f) => ["WAKE", "BAG", "DIARY", "30", "NOTE", "03"].includes(f)).length || 0;
+            const finalDone = p?.tier3?.room306;
+            const submitted = p?.quizSubmitted;
+            const score = scoreOf(p);
+            return (
+              <div key={t} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+                background: C.card, borderRadius: 10, padding: "16px 18px", border: `1px solid #5A4530`,
+              }}>
+                <span style={{ color: C.cream, fontWeight: 700, fontSize: 19 }}>{t}</span>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <Chip>조각 {fragCount}/6</Chip>
+                  {finalDone && <Chip tone="good">최종증거 확보</Chip>}
+                  {submitted ? <Chip tone="good">제출완료 {score}/9</Chip> : <Chip>미제출</Chip>}
+                  <button onClick={() => resetTeam(t)} disabled={deleting === t}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, background: "rgba(217,119,106,0.12)",
+                      border: `1px solid ${C.bad}`, color: C.bad, borderRadius: 8, padding: "7px 12px",
+                      fontSize: 13.5, fontWeight: 700, cursor: deleting === t ? "default" : "pointer",
+                    }}>
+                    <Trash2 size={14} /> {deleting === t ? "삭제 중..." : "삭제"}
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1284,4 +1374,33 @@ function QuizPanel({ progress, setProgress }) {
       )}
     </div>
   );
+}
+
+/* ─────────────────────────────────────────
+   최상위 App — 로그인 세션 관리
+   ───────────────────────────────────────── */
+const SESSION_KEY = "rp_session_v1";
+
+export default function App() {
+  const [session, setSession] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = (s) => {
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
+    setSession(s);
+  };
+  const handleLogout = () => {
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    setSession(null);
+  };
+
+  if (!session) return <LoginScreen onLogin={handleLogin} />;
+  if (session.role === "admin") return <AdminPanel onLogout={handleLogout} />;
+  return <TeamGame team={session.team} onLogout={handleLogout} />;
 }
